@@ -1,9 +1,10 @@
 import json
+import os
+import sys
+
 import ijson
 from pymongo import MongoClient
 from tqdm import tqdm
-import os
-import sys
 
 # --- CONFIG ---
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27018/")

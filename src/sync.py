@@ -1,15 +1,18 @@
-import logging
 import asyncio
-import os
-import pandas as pd
+import csv
 import io
 import json
-import csv
+import logging
+import os
 from datetime import datetime, timezone
 from typing import Optional
 from functools import partial
+
+import pandas as pd
 from sqlalchemy import text
-from src.db import engine, get_mongo_client
+
+import src.db
+from src.db import get_mongo_client
 
 logger = logging.getLogger("sync")
 
@@ -38,30 +41,30 @@ def psql_insert_copy(table, conn, keys, data_iter):
         writer.writerows(data_iter)
         s_buf.seek(0)
 
-        columns = ', '.join('"{}"'.format(k) for k in keys)
+        columns = ', '.join(f'"{k}"' for k in keys)
         if table.schema:
-            table_name = '{}.{}'.format(table.schema, table.name)
+            table_name = f'{table.schema}.{table.name}'
         else:
             table_name = table.name
 
-        sql = 'COPY {} ({}) FROM STDIN WITH CSV'.format(table_name, columns)
+        sql = f'COPY {table_name} ({columns}) FROM STDIN WITH CSV'
         cur.copy_expert(sql=sql, file=s_buf)
 
 def write_df_to_sql_sync(df: pd.DataFrame, table_name: str):
     """
     Synchronous function to write DataFrame to SQL using high-speed COPY.
     """
-    with engine.begin() as conn:
+    with src.db.engine.begin() as conn:
         df.to_sql(table_name, conn, if_exists="append", index=False, method=psql_insert_copy)
 
-async def get_last_synced(source_uri: str, collection_name: str) -> Optional[datetime]:
+async def get_last_synced(source_uri: str, collection_name: str) -> datetime | None:
     query = text("""
         SELECT last_synced_at FROM sync_metadata
         WHERE source_uri = :source_uri AND collection_name = :collection_name
     """)
     # Running short SQL reads in the main thread is usually acceptable, 
     # but could also be offloaded if high concurrency is expected.
-    with engine.connect() as conn:
+    with src.db.engine.connect() as conn:
         row = conn.execute(query, {"source_uri": source_uri, "collection_name": collection_name}).fetchone()
         if row and row[0]:
             ts = row[0]
@@ -78,23 +81,33 @@ async def update_last_synced(source_uri: str, collection_name: str, ts: datetime
         ON CONFLICT (source_uri, collection_name)
         DO UPDATE SET last_synced_at = EXCLUDED.last_synced_at
     """)
-    with engine.begin() as conn:
+    with src.db.engine.begin() as conn:
         conn.execute(query, {
             "source_uri": source_uri,
             "collection_name": collection_name,
             "last_synced_at": ts
         })
 
+
 async def sync_collection_streaming(
     source_uri: str,
     collection_name: str,
-    batch_size: int = 5000
+    batch_size: int | None = None
 ):
-    logger.info(f"Starting sync for {collection_name} from {source_uri}")
+    if batch_size is None:
+        batch_size = int(os.getenv("SYNC_BATCH_SIZE", "5000"))
+
+    logger.info(f"Starting sync for {collection_name} from {source_uri} with batch_size={batch_size}")
     client = get_mongo_client(source_uri)
     
     # Dynamically get database name from URI or fallback to MONGO_DB_NAME env var
-    db_name = client.get_default_database().name if client.get_default_database() is not None else os.getenv("MONGO_DB_NAME", "source_db")
+    # NOTE: In Motor 3.3.2+, get_default_database() raises if no db in URI
+    try:
+        default_db = client.get_default_database()
+    except Exception:
+        default_db = None
+        
+    db_name = default_db.name if default_db else os.getenv("MONGO_DB_NAME", "source_db")
     db = client[db_name]
 
     last_synced = await get_last_synced(source_uri, collection_name)
@@ -112,6 +125,7 @@ async def sync_collection_streaming(
     # Get the running event loop to schedule blocking tasks
     loop = asyncio.get_running_loop()
 
+    
     try:
         async for doc in cursor:
             buffer.append(doc)
@@ -125,7 +139,8 @@ async def sync_collection_streaming(
                         latest_timestamp = updated_at
 
             if len(buffer) >= batch_size:
-                df = pd.json_normalize(buffer, sep="_")
+                # Use DataFrame constructor instead of json_normalize to prevent flattening
+                df = pd.DataFrame(buffer)
                 df = clean_dataframe(df)
                 df["_source"] = source_uri
                 df["_synced_at"] = datetime.now(timezone.utc)
@@ -141,7 +156,7 @@ async def sync_collection_streaming(
 
         # Process remaining buffer
         if buffer:
-            df = pd.json_normalize(buffer, sep="_")
+            df = pd.DataFrame(buffer)
             df = clean_dataframe(df)
             df["_source"] = source_uri
             df["_synced_at"] = datetime.now(timezone.utc)

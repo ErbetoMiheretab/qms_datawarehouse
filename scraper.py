@@ -1,7 +1,7 @@
-import aiohttp
 import asyncio
 import json
-from typing import List
+
+import aiohttp
 
 API_BASE_URL = "http://172.16.26.12:3029/api/displayticket/staff-report"
 BEARER_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4ZWE3NTkzZTBlMGNiNWQ2ZWY5NTBjZCIsImVtYWlsIjoiYWRkaXNtZXNvYjJAZXQuY29tIiwidXNlcm5hbWUiOiJhZGRpcy0wMi1zeXMtc3lzIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzY3MDE1NDc4LCJleHAiOjE3NjcwMTkwNzh9.vW1nlmrdmYBDthzQpnF2_JvIBPCDNE3cg6a33BEgWes"  # shorten for safety
@@ -43,7 +43,7 @@ async def fetch_staff_report(
         return await resp.json()
 
 
-async def scrape_all_staff(usernames: List[str]) -> List[dict]:
+async def scrape_all_staff(usernames: list[str]) -> list[dict]:
     timeout = aiohttp.ClientTimeout(total=15)
 
     async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -54,7 +54,7 @@ async def scrape_all_staff(usernames: List[str]) -> List[dict]:
         clean = []
         for r in results:
             if isinstance(r, Exception):
-                print(f"❌ {r}")
+                print(f"{r}")
             elif r:
                 clean.append(r)
 
@@ -69,7 +69,7 @@ async def main():
     with open("staff_reports.json", "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
-    print("✅ Saved to staff_reports.json")
+    print("Saved to staff_reports.json")
 
 
 if __name__ == "__main__":

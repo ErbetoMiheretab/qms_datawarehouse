@@ -1,7 +1,9 @@
 import asyncio
-from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime
+
 from bson import ObjectId
+from motor.motor_asyncio import AsyncIOMotorClient
+
 
 async def seed_all_tables(uri):
     client = AsyncIOMotorClient(uri)

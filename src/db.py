@@ -1,9 +1,8 @@
 # src/db.py
+import os
+
 from motor.motor_asyncio import AsyncIOMotorClient
 from sqlalchemy import create_engine, text
-import os
-from typing import Dict
-
 
 # --- PostgreSQL ---
 WAREHOUSE_URL = os.getenv("WAREHOUSE_URL")
@@ -32,7 +31,7 @@ def init_metadata_table():
         conn.execute(query)
 
 # --- MongoDB ---
-_mongo_clients: Dict[str, AsyncIOMotorClient] = {}
+_mongo_clients: dict[str, AsyncIOMotorClient] = {}
 
 def get_mongo_client(uri: str) -> AsyncIOMotorClient:
     """Get or create a singleton MongoDB client for the given URI."""
