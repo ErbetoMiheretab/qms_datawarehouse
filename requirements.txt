@@ -1,0 +1,19 @@
+# Web Server & Framework
+fastapi
+granian
+uvicorn
+
+# Database Drivers
+motor
+pymongo
+sqlalchemy
+psycopg2-binary
+
+# Data Processing
+pandas
+numpy
+
+# Testing
+pytest
+pytest-asyncio
+testcontainers
