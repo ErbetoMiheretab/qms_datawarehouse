@@ -11,6 +11,16 @@ services:
     image: postgres:latest
     environment:
       POSTGRES_USER: admin
-      POSTGRES_PASSWORD: pass
+      POSTGRES_PASSWORD: supersecretpassword
       POSTGRES_DB: analytics
     ports: ["5432:5432"]
+  redis:
+    image: redis:alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
