@@ -1,0 +1,16 @@
+services:
+  mongo-a:
+    image: mongo:latest
+    ports: ["27017:27017"]
+  
+  mongo-b:
+    image: mongo:latest
+    ports: ["27018:27017"]
+
+  warehouse:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: analytics
+    ports: ["5432:5432"]
