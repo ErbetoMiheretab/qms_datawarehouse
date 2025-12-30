@@ -1,37 +1,38 @@
-# src/main.py
 import logging
 import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from redis import Redis
+from fastapi.middleware.cors import CORSMiddleware
+from redis.asyncio import Redis
 
 from src.api.routes import router as api_router
 from src.config import settings
-from src.core.db import close_mongo_clients, init_metadata_table
+from src.core.db import close_mongo_clients, init_metadata_table, run_sync
+
+from src.core.logger import setup_logging
 
 # Setup Logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
+setup_logging()
 logger = logging.getLogger("main")
-
-# Verify Redis connection on startup
-try:
-    r = Redis.from_url(settings.REDIS_URL)
-    r.ping()
-    r.close()
-except Exception as e:
-    logger.error(f"FATAL: Redis connection failed: {e}")
-    sys.exit(1)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting up sync service...")
+    
+    # Verify Redis connection
     try:
-        init_metadata_table()
+        r = Redis.from_url(settings.REDIS_URL)
+        await r.ping()
+        await r.close()
+        logger.info("Redis connection verified.")
+    except Exception as e:
+        logger.error(f"FATAL: Redis connection failed: {e}")
+        sys.exit(1)
+
+    try:
+        # init_metadata_table is sync, run it in executor
+        await run_sync(init_metadata_table)
         logger.info("Metadata table checked/created.")
     except Exception as e:
         logger.error(f"Failed to init DB: {e}")
@@ -43,4 +44,13 @@ async def lifespan(app: FastAPI):
     close_mongo_clients()
 
 app = FastAPI(title="ETL Sync Service", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In strict prod, restrict this.
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(api_router)

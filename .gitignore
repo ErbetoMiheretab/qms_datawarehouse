@@ -11,3 +11,6 @@ wheels/
 .env
 a/
 b/
+
+.ruff_cache/
+.vscode/

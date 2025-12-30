@@ -1,6 +1,6 @@
-# src/config.py
 import json
 import os
+import sys
 
 # Use built-in dict type for annotations (typing.Dict is deprecated)
 from dotenv import load_dotenv
@@ -15,8 +15,9 @@ class Settings:
     REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
     
     # App Config
-    MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "source_db")
+    MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "queuemangementsystem")
     SYNC_BATCH_SIZE = int(os.getenv("SYNC_BATCH_SIZE", "5000"))
+    DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "t")
     
     # Auth
     API_KEY = os.getenv("API_KEY")
@@ -34,6 +35,9 @@ class Settings:
         """
         sources_str = os.getenv("MONGO_SOURCES", "")
         
+        if not sources_str:
+            return 
+            
         try:
             # Attempt 1: Parse as JSON Key-Value pairs
             parsed = json.loads(sources_str)
@@ -48,10 +52,17 @@ class Settings:
             self.MONGO_SOURCES = {f"source_{i+1}": uri for i, uri in enumerate(raw_list)}
 
     def validate(self):
+        errors = []
         if not self.WAREHOUSE_URL:
-            raise RuntimeError("WAREHOUSE_URL environment variable is required")
+            errors.append("WAREHOUSE_URL environment variable is required")
         if not self.MONGO_SOURCES:
-            raise RuntimeError("MONGO_SOURCES env var must be set (JSON dict or CSV list)")
+            errors.append("MONGO_SOURCES env var must be set (JSON dict or CSV list)")
+        
+        if errors:
+            print("Configuration Errors:", file=sys.stderr)
+            for err in errors:
+                print(f"- {err}", file=sys.stderr)
+            sys.exit(1)
 
 # Initialize and validate
 settings = Settings()

@@ -139,7 +139,7 @@ import pandas as pd
 from sqlalchemy import text
 
 from src.config import settings
-from src.core.db import engine, get_mongo_client, psql_insert_copy
+from src.core.db import engine, get_mongo_client, psql_insert_copy, run_sync
 from src.services.transform import clean_dataframe
 
 logger = logging.getLogger("etl")
@@ -161,23 +161,26 @@ def write_df_to_sql_sync(df: pd.DataFrame, table_name: str):
             method=psql_insert_copy
         )
 
-async def get_last_synced(source_name: str, collection_name: str) -> datetime | None:
-    """
-    Fetches the last sync timestamp using the Source Name (e.g., 'primary_site').
-    """
+def _get_last_synced_sync(source_name: str, collection_name: str) -> datetime | None:
+    """Sync implementation of get_last_synced."""
     query = text("""
         SELECT last_synced_at FROM sync_metadata
         WHERE source_uri = :source_name AND collection_name = :collection_name
     """)
     with engine.connect() as conn:
-        # We use 'source_uri' column to store the name now
         row = conn.execute(query, {"source_name": source_name, "collection_name": collection_name}).fetchone()
         if row and row[0]:
             ts = row[0]
             return ts if ts.tzinfo else ts.replace(tzinfo=UTC)
     return None
 
-async def update_last_synced(source_name: str, collection_name: str, ts: datetime):
+async def get_last_synced(source_name: str, collection_name: str) -> datetime | None:
+    """
+    Fetches the last sync timestamp using the Source Name (e.g., 'primary_site').
+    """
+    return await run_sync(_get_last_synced_sync, source_name, collection_name)
+
+def _update_last_synced_sync(source_name: str, collection_name: str, ts: datetime):
     if ts.tzinfo is None:
         ts = ts.replace(tzinfo=UTC)
         
@@ -193,6 +196,9 @@ async def update_last_synced(source_name: str, collection_name: str, ts: datetim
             "collection_name": collection_name,
             "last_synced_at": ts
         })
+
+async def update_last_synced(source_name: str, collection_name: str, ts: datetime):
+    await run_sync(_update_last_synced_sync, source_name, collection_name, ts)
 
 async def _process_batch(buffer: list[dict[str, Any]], source_name: str, collection: str, loop: asyncio.AbstractEventLoop):
     """
@@ -244,7 +250,10 @@ async def sync_collection_streaming(source_name: str, source_uri: str, collectio
     last_synced = await get_last_synced(source_name, collection_name)
     query = {}
     if last_synced:
+        logger.info(f"[{source_name}] Resuming sync from {last_synced}")
         query["updated_at"] = {"$gt": last_synced}
+    else:
+        logger.info(f"[{source_name}] Full sync started (no checkpoint found)")
 
     cursor = db[collection_name].find(query).sort("updated_at", 1)
     
@@ -256,6 +265,8 @@ async def sync_collection_streaming(source_name: str, source_uri: str, collectio
     loop = asyncio.get_running_loop()
 
     try:
+        logger.info(f"[{source_name}] Started fetching documents...")
+        start_time = datetime.now()
         async for doc in cursor:
             buffer.append(doc)
             
@@ -267,6 +278,7 @@ async def sync_collection_streaming(source_name: str, source_uri: str, collectio
 
             if len(buffer) >= batch_size:
                 # Call helper with exactly 4 arguments
+                logger.debug(f"[{source_name}] Processing batch of {len(buffer)} records...")
                 await _process_batch(buffer, source_name, collection_name, loop)
                 count += len(buffer)
                 buffer = []
@@ -280,7 +292,7 @@ async def sync_collection_streaming(source_name: str, source_uri: str, collectio
         if latest_timestamp:
             await update_last_synced(source_name, collection_name, latest_timestamp)
 
-        msg = f"Synced {count} rows from {source_name} to {collection_name}"
+        msg = f"Synced {count} rows from {source_name} to {collection_name} in {(datetime.now() - start_time).total_seconds():.2f}s"
         logger.info(msg)
         return msg
 

@@ -6,13 +6,21 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from sqlalchemy import create_engine, text
 from src.config import settings
 
+import logging
 # --- PostgreSQL Engine ---
-engine = create_engine(
-    settings.WAREHOUSE_URL,
-    pool_size=10,
-    max_overflow=20,
-    pool_pre_ping=True,
-)
+logger = logging.getLogger("db")
+
+try:
+    engine = create_engine(
+        settings.WAREHOUSE_URL,
+        pool_size=10,
+        max_overflow=20,
+        pool_pre_ping=True,
+    )
+    logger.info(f"PostgreSQL Engine created for {settings.WAREHOUSE_URL.split('@')[-1]}")
+except Exception as e:
+    logger.critical(f"Failed to create PostgreSQL engine: {e}")
+    raise
 
 # --- MongoDB Client Management ---
 _mongo_clients: Dict[str, AsyncIOMotorClient] = {}
@@ -63,3 +71,14 @@ def psql_insert_copy(table, conn, keys, data_iter):
 
         sql = f'COPY {table_name} ({columns}) FROM STDIN WITH CSV'
         cur.copy_expert(sql=sql, file=s_buf)
+
+async def run_sync(func, *args, **kwargs):
+    """
+    Runs a synchronous function in a thread pool to avoid blocking the event loop.
+    Example: await run_sync(some_blocking_io, arg1, kwarg2='value')
+    """
+    import asyncio
+    from functools import partial
+    
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, partial(func, *args, **kwargs))

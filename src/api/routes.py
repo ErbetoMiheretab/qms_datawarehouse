@@ -2,7 +2,7 @@ import logging
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from redis import Redis
+from redis.asyncio import Redis
 
 from src.api.deps import get_api_key
 from src.config import settings
@@ -17,13 +17,15 @@ redis_client = Redis.from_url(settings.REDIS_URL, decode_responses=True)
 
 async def run_sync_task(task_id: str,source_name: str ,source_uri: str, collection: str):
     """Background task wrapper."""
-    redis_client.hset(task_id, source_uri, "running")
+    await redis_client.hset(task_id, source_uri, "running")
+    logger.info(f"Task {task_id} started for {collection} from source {source_name}")
     try:
         result = await sync_collection_streaming(source_name, source_uri, collection)
-        redis_client.hset(task_id, source_uri, f"success: {result}")
+        await redis_client.hset(task_id, source_uri, f"success: {result}")
+        logger.info(f"Task {task_id} completed for source {source_name}: {result}")
     except Exception as e:
-        redis_client.hset(task_id, source_uri, f"failed: {e!s}")
-        logger.error(f"Task {task_id} failed: {e}")
+        await redis_client.hset(task_id, source_uri, f"failed: {e!s}")
+        logger.error(f"Task {task_id} failed for source {source_name}: {e}")
 
 @router.get("/health")
 async def health():
@@ -31,15 +33,17 @@ async def health():
 
 @router.post("/sync/{collection}", dependencies=[Depends(get_api_key)])
 async def trigger_sync(collection: str, background_tasks: BackgroundTasks):
+    logger.info(f"Received sync request for collection: {collection}")
     # Double check regex manual validation if needed, though Pydantic handles validation
     if not collection.replace("_", "").replace("-", "").isalnum():
+         logger.warning(f"Invalid collection name rejected: {collection}")
          raise HTTPException(400, "Invalid collection name")
 
     task_id = str(uuid.uuid4())
     
-    redis_client.hset(task_id, "meta:total_sources", len(settings.MONGO_SOURCES))
-    redis_client.hset(task_id, "meta:collection", collection)
-    redis_client.expire(task_id, 3600)
+    await redis_client.hset(task_id, "meta:total_sources", len(settings.MONGO_SOURCES))
+    await redis_client.hset(task_id, "meta:collection", collection)
+    await redis_client.expire(task_id, 3600)
 
     for name,uri in settings.MONGO_SOURCES.items():
         background_tasks.add_task(run_sync_task, task_id,name, uri, collection)
@@ -52,7 +56,9 @@ async def trigger_sync(collection: str, background_tasks: BackgroundTasks):
 
 @router.get("/sync/status/{task_id}", dependencies=[Depends(get_api_key)])
 async def get_sync_status(task_id: str):
-    data = redis_client.hgetall(task_id)
+    logger.debug(f"Checking status for task {task_id}")
+    data = await redis_client.hgetall(task_id)
     if not data:
+        logger.warning(f"Status check failed: Task {task_id} not found")
         raise HTTPException(404, "Task not found or expired")
     return {"task_id": task_id, "details": data}

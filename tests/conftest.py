@@ -17,8 +17,9 @@ os.environ["REDIS_URL"] = "redis://mock"
 
 # Import app modules AFTER setting env vars
 import src.db
-import src.main
 from src.db import close_mongo_clients, init_metadata_table
+
+import src.main
 from src.main import app
 
 # -- Global Containers --
@@ -98,7 +99,8 @@ def patch_globals(mongo_container, postgres_container, redis_container, monkeypa
     src.db.engine = original_engine
 
 
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport
+
 
 @pytest.fixture
 async def async_client():

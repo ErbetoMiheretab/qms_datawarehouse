@@ -1,9 +1,8 @@
 from datetime import datetime
 
 import pytest
-from sqlalchemy import text
-
 import src.db
+from sqlalchemy import text
 from src.db import get_mongo_client
 from src.sync import sync_collection_streaming
 
