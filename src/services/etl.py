@@ -8,7 +8,7 @@ from typing import Optional
 from sqlalchemy import text
 
 from src.config import settings
-from src.core.database import engine, get_mongo_client, psql_insert_copy
+from src.core.db import engine, get_mongo_client, psql_insert_copy
 from src.services.transform import clean_dataframe
 
 logger = logging.getLogger("etl")

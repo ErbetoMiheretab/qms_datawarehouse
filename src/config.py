@@ -18,7 +18,7 @@ class Settings:
     
     # App
     # API_KEY = os.getenv("API_KEY")
-    # API_KEY_NAME = "X-API-Key"
+    API_KEY_NAME = "X-API-Key"
     SYNC_BATCH_SIZE = int(os.getenv("SYNC_BATCH_SIZE", "5000"))
 
     def validate(self):
