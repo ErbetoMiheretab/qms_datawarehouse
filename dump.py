@@ -9,8 +9,13 @@ from tqdm import tqdm
 # --- CONFIG ---
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27018/")
 DB_NAME = "source_db"
-COLLECTION_NAME = "display_ticket"
-JSON_FILE = "display_tickets.json"
+# # COLLECTION_NAME = "user"
+# JSON_FILE = "./a/users.json"
+COLLECTIONS = {
+    "user": "./b/users.json",
+    "ticket": "./b/tickets.json",
+    "display_ticket": "./b/display_tickets.json"
+}
 BATCH_SIZE = 1000
 
 # --- CONNECT TO MONGODB ---
@@ -157,69 +162,181 @@ def create_indexes(collection):
 def main():
     """Main execution flow"""
     print("=" * 50)
-    print(" MongoDB JSON Import Tool")
+    print(" MongoDB JSON Import Tool (Multi-Collection)")
     print("=" * 50)
-    
-    # Validate file exists
-    if not os.path.exists(JSON_FILE):
-        print(f" File not found: {JSON_FILE}")
-        sys.exit(1)
     
     # Connect to MongoDB
     client = connect_to_mongo()
     db = client[DB_NAME]
-    collection = db[COLLECTION_NAME]
-    
-    # Clear existing data
-    try:
-        deleted_count = collection.delete_many({}).deleted_count
-        print(f"Cleared {deleted_count} existing documents from '{COLLECTION_NAME}'")
-    except Exception as e:
-        print(f" Failed to clear collection: {e}")
-        client.close()
-        sys.exit(1)
-    
-    # Detect file format
-    file_format = detect_format(JSON_FILE)
-    print(f" Detected format: {file_format}")
-    
-    # Count items (optional - comment out for very large files)
-    print(" Counting items...")
-    total_items = count_items(JSON_FILE, file_format)
-    if total_items:
-        print(f" Found {total_items:,} items")
-    else:
-        print(" Skipping count, processing without progress percentage")
-    
-    # Process file based on format
-    try:
-        if file_format == "array":
-            success, failed = process_json_array(JSON_FILE, collection, total_items)
-        else:
-            success, failed = process_line_delimited(JSON_FILE, collection, total_items)
-        
-        # Create indexes
-        if success > 0:
-            print("\n Creating indexes...")
-            create_indexes(collection)
-        
-        # Final summary
-        print("\n" + "=" * 50)
-        print(" IMPORT SUMMARY")
-        print("=" * 50)
-        print(f" Total inserted: {success:,}")
-        print(f" Total failed: {failed:,}")
-        print(f" Collection: {DB_NAME}.{COLLECTION_NAME}")
-        print(f" Final count: {collection.count_documents({}):,}")
-        print("=" * 50)
-        
-    except KeyboardInterrupt:
-        print("\n\n Import interrupted by user")
-    except Exception as e:
-        print(f"\n Unexpected error: {e}")
-    finally:
-        client.close()
-        print("\n MongoDB connection closed")
 
+    overall_success = 0
+    overall_failed = 0
+
+    for collection_name, json_file in COLLECTIONS.items():
+        print(f"\n{'-' * 50}")
+        print(f" Processing: '{collection_name}' ← {json_file}")
+        print("-" * 50)
+
+        # Validate file exists
+        if not os.path.exists(json_file):
+            print(f"Skip: File not found: {json_file}")
+            continue
+
+        collection = db[collection_name]
+
+        # Clear existing data
+        try:
+            deleted_count = collection.delete_many({}).deleted_count
+            print(f"Cleared {deleted_count} existing documents from '{collection_name}'")
+        except Exception as e:
+            print(f"Failed to clear collection '{collection_name}': {e}")
+            # Don't exit—continue to next collection
+            continue
+
+        # Detect file format
+        try:
+            file_format = detect_format(json_file)
+            print(f"Detected format: {file_format}")
+        except Exception as e:
+            print(f"Could not detect format for {json_file}: {e}")
+            continue
+
+        # Count items (optional)
+        print("Counting items...")
+        total_items = count_items(json_file, file_format)
+        if total_items:
+            print(f"Found {total_items:,} items")
+        else:
+            print("Skipping count")
+
+        # Process file
+        try:
+            if file_format == "array":
+                success, failed = process_json_array(json_file, collection, total_items)
+            else:
+                success, failed = process_line_delimited(json_file, collection, total_items)
+
+            overall_success += success
+            overall_failed += failed
+
+            # Create indexes (optional)
+            if success > 0:
+                print("\n Creating indexes...")
+                create_indexes(collection)  # Note: current create_indexes() takes only collection
+
+            final_count = collection.count_documents({})
+            print(f"\n Final count in '{collection_name}': {final_count:,}")
+
+        except KeyboardInterrupt:
+            print("\n Interrupted by user")
+            break
+        except Exception as e:
+            print(f" Error processing '{collection_name}': {e}")
+            continue
+
+    # Final summary
+    print("\n" + "=" * 50)
+    print(" IMPORT COMPLETE")
+    print("=" * 50)
+    print(f" Total inserted: {overall_success:,}")
+    print(f" Total failed:   {overall_failed:,}")
+    print(f" Processed {len(COLLECTIONS)} collections")
+    print("=" * 50)
+
+    client.close()
+    print("🔌 MongoDB connection closed")
+
+# def main():
+#     """Main execution flow"""
+#     print("=" * 50)
+#     print(" MongoDB JSON MongoDB JSON Import Tool (Multi-Collection)")
+#     print("=" * 50)
+    
+#     # # Validate file exists
+#     # if not os.path.exists(JSON_FILE):
+#     #     print(f" File not found: {JSON_FILE}")
+#     #     sys.exit(1)
+    
+#     # Connect to MongoDB
+#     client = connect_to_mongo()
+#     db = client[DB_NAME]
+#     # collection = db[COLLECTION_NAME]
+
+#     overall_success = 0
+#     overall_failed = 0
+
+#     for collection_name, json_file in COLLECTIONS.items():
+#         # print(f"\n=== Processing collection '{collection_name}' from {json_file} ===")
+#         print(f"\n{'-' * 50}")
+#         print(f"🔁 Processing: '{collection_name}' ← {json_file}")
+#         print("-" * 50)
+
+#         if not os.path.exists(json_file):
+#             print(f"Skip: File not found: {json_file}")
+#             continue
+
+#         collection = db[collection_name]
+
+#     # # Validate file exists
+#     # if not os.path.exists(json_file):
+#     #     print(f" File not found: {json_file}")
+#     #     continue
+
+#     # collection = db[collection_name]
+
+    
+#     # Clear existing data
+#     try:
+#         deleted_count = collection.delete_many({}).deleted_count
+#         print(f"Cleared {deleted_count} existing documents from '{COLLECTION_NAME}'")
+#     except Exception as e:
+#         print(f" Failed to clear collection: {e}")
+#         client.close()
+#         sys.exit(1)
+    
+#     # Detect file format
+#     file_format = detect_format(JSON_FILE)
+#     print(f" Detected format: {file_format}")
+    
+#     # Count items (optional - comment out for very large files)
+#     print(" Counting items...")
+#     total_items = count_items(JSON_FILE, file_format)
+#     if total_items:
+#         print(f" Found {total_items:,} items")
+#     else:
+#         print(" Skipping count, processing without progress percentage")
+    
+#     # Process file based on format
+#     try:
+#         if file_format == "array":
+#             success, failed = process_json_array(JSON_FILE, collection, total_items)
+#         else:
+#             success, failed = process_line_delimited(JSON_FILE, collection, total_items)
+        
+#         # Create indexes
+#         if success > 0:
+#             print("\n Creating indexes...")
+#             create_indexes(collection_name, collection)
+        
+#         # Final summary
+#         print("\n" + "=" * 50)
+#         print(" IMPORT SUMMARY")
+#         print("=" * 50)
+#         print(f" Total inserted: {success:,}")
+#         print(f" Total failed: {failed:,}")
+#         print(f" Collection: {DB_NAME}.{COLLECTION_NAME}")
+#         print(f" Final count: {collection.count_documents({}):,}")
+#         print("=" * 50)
+        
+#     except KeyboardInterrupt:
+#         print("\n\n Import interrupted by user")
+#     except Exception as e:
+#         print(f"\n  Critical error processing '{collection_name}': {e}")
+#     finally:
+#         client.close()
+#         print("\n MongoDB connection closed")
+#     print(f"Total inserted: {overall_success:,}")
+#     print(f"Total failed:   {overall_failed:,}")
+#     print(f"Processed {len(COLLECTIONS)} collections")
 if __name__ == "__main__":
     main()

@@ -1,0 +1,44 @@
+services:
+  # Mock MongoDB Source 1
+  mongo_source_a:
+    image: mongo:latest
+    container_name: mongo_a
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: source_db
+
+  # Mock MongoDB Source 2
+  mongo_source_b:
+    image: mongo:latest
+    container_name: mongo_b
+    ports:
+      - "27018:27017"
+    environment:
+      MONGO_INITDB_DATABASE: source_db
+
+  # Central Data Warehouse (Postgres)
+  warehouse:
+    image: postgres:latest
+    container_name: analytics_warehouse
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: analytics
+
+  # Your FastAPI ETL Engine
+  etl_engine:
+    build: .
+    container_name: fastapi_etl
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongo_source_a
+      - mongo_source_b
+      - warehouse
+    environment:
+      - MONGO_A_URI=mongodb://mongo_source_a:27017/source_db
+      - MONGO_B_URI=mongodb://mongo_source_b:27017/source_db
+      - WAREHOUSE_URL=postgresql://admin:pass@warehouse:5432/analytics

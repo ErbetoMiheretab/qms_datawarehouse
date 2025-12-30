@@ -1,0 +1,77 @@
+[
+  {
+    "roomUserName": "AMINFO-01-KIDIST-K",
+    "companyNames": [
+      "ንግድ ቢሮ"
+    ],
+    "companyPicture": "1760520937694-330441742.jpg",
+    "staffPicture": "1757448561932-212857186.jpg",
+    "totalTickets": 673,
+    "avgTicketsPerDay": 10,
+    "minTicketsPerDay": 1,
+    "maxTicketsPerDay": 53,
+    "avgTimeToServe": "14m 52s",
+    "minTimeToServe": "0m 0s",
+    "maxTimeToServe": "431m 23s"
+  },
+  {
+    "roomUserName": "AMINFO-02-Selam-T",
+    "companyNames": [
+      "ንግድ ቢሮ"
+    ],
+    "companyPicture": "1760520937694-330441742.jpg",
+    "staffPicture": "1758286903468-452153934.JPG",
+    "totalTickets": 284,
+    "avgTicketsPerDay": 5,
+    "minTicketsPerDay": 1,
+    "maxTicketsPerDay": 25,
+    "avgTimeToServe": "13m 20s",
+    "minTimeToServe": "0m 0s",
+    "maxTimeToServe": "260m 48s"
+  },
+  {
+    "roomUserName": "AMINFO-03-Bizuye-B",
+    "companyNames": [
+      "ንግድ ቢሮ"
+    ],
+    "companyPicture": "1760520937694-330441742.jpg",
+    "staffPicture": "1758287354335-973212355.jpg",
+    "totalTickets": 406,
+    "avgTicketsPerDay": 7,
+    "minTicketsPerDay": 1,
+    "maxTicketsPerDay": 27,
+    "avgTimeToServe": "11m 0s",
+    "minTimeToServe": "0m 0s",
+    "maxTimeToServe": "296m 33s"
+  },
+  {
+    "roomUserName": "AMINFO-04-Birhanu-F",
+    "companyNames": [
+      "ንግድ ቢሮ"
+    ],
+    "companyPicture": "1760520937694-330441742.jpg",
+    "staffPicture": "1757448408017-50157084.jpg",
+    "totalTickets": 180,
+    "avgTicketsPerDay": 6,
+    "minTicketsPerDay": 1,
+    "maxTicketsPerDay": 15,
+    "avgTimeToServe": "11m 13s",
+    "minTimeToServe": "0m 0s",
+    "maxTimeToServe": "265m 23s"
+  },
+  {
+    "roomUserName": "AMINFO-05-Birhanu-G",
+    "companyNames": [
+      "ንግድ ቢሮ"
+    ],
+    "companyPicture": "1760520937694-330441742.jpg",
+    "staffPicture": "1760529588650-136236564.jpg",
+    "totalTickets": 6,
+    "avgTicketsPerDay": 2,
+    "minTicketsPerDay": 1,
+    "maxTicketsPerDay": 3,
+    "avgTimeToServe": "61m 22s",
+    "minTimeToServe": "0m 11s",
+    "maxTimeToServe": "172m 19s"
+  }
+]
