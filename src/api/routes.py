@@ -1,27 +1,28 @@
-import uuid
 import logging
+import uuid
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from redis import Redis
 
-from src.config import settings
-from src.schemas.request import SyncRequest
 from src.api.deps import get_api_key
+from src.config import settings
 from src.services.etl import sync_collection_streaming
 
+# from src.schemas.request import SyncRequest
 router = APIRouter()
 logger = logging.getLogger("api")
 
 # Redis connection (could also be moved to core/database.py if complex)
 redis_client = Redis.from_url(settings.REDIS_URL, decode_responses=True)
 
-async def run_sync_task(task_id: str, source_uri: str, collection: str):
+async def run_sync_task(task_id: str,source_name: str ,source_uri: str, collection: str):
     """Background task wrapper."""
     redis_client.hset(task_id, source_uri, "running")
     try:
-        result = await sync_collection_streaming(source_uri, collection)
+        result = await sync_collection_streaming(source_name, source_uri, collection)
         redis_client.hset(task_id, source_uri, f"success: {result}")
     except Exception as e:
-        redis_client.hset(task_id, source_uri, f"failed: {str(e)}")
+        redis_client.hset(task_id, source_uri, f"failed: {e!s}")
         logger.error(f"Task {task_id} failed: {e}")
 
 @router.get("/health")
@@ -40,13 +41,13 @@ async def trigger_sync(collection: str, background_tasks: BackgroundTasks):
     redis_client.hset(task_id, "meta:collection", collection)
     redis_client.expire(task_id, 3600)
 
-    for uri in settings.MONGO_SOURCES:
-        background_tasks.add_task(run_sync_task, task_id, uri, collection)
+    for name,uri in settings.MONGO_SOURCES.items():
+        background_tasks.add_task(run_sync_task, task_id,name, uri, collection)
 
     return {
         "task_id": task_id, 
         "status": "started", 
-        "sources_count": len(settings.MONGO_SOURCES)
+        "sources_count": len(settings.MONGO_SOURCES.keys())
     }
 
 @router.get("/sync/status/{task_id}", dependencies=[Depends(get_api_key)])

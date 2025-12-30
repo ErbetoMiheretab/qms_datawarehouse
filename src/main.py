@@ -2,12 +2,13 @@
 import logging
 import sys
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from redis import Redis
 
-from src.config import settings
-from src.core.db import init_metadata_table, close_mongo_clients
 from src.api.routes import router as api_router
+from src.config import settings
+from src.core.db import close_mongo_clients, init_metadata_table
 
 # Setup Logging
 logging.basicConfig(
