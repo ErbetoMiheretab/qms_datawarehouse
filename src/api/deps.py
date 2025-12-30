@@ -1,4 +1,4 @@
-from fastapi import Security, HTTPException
+from fastapi import HTTPException, Security
 from fastapi.security.api_key import APIKeyHeader
 
 from src.config import settings
