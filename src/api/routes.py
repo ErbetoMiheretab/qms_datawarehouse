@@ -62,3 +62,27 @@ async def get_sync_status(task_id: str):
         logger.warning(f"Status check failed: Task {task_id} not found")
         raise HTTPException(404, "Task not found or expired")
     return {"task_id": task_id, "details": data}
+
+def _fetch_sync_logs(limit: int):
+    from sqlalchemy import text
+    from src.core.db import engine
+    
+    query = text("""
+        SELECT * FROM sync_history 
+        ORDER BY started_at DESC 
+        LIMIT :limit
+    """)
+    with engine.connect() as conn:
+        # Use mappings() to get dictionary-like rows
+        result = conn.execute(query, {"limit": limit}).mappings().all()
+        return [dict(row) for row in result]
+
+@router.get("/sync/logs", dependencies=[Depends(get_api_key)])
+async def get_sync_logs(limit: int = 50):
+    from src.core.db import run_sync
+    try:
+        logs = await run_sync(_fetch_sync_logs, limit)
+        return {"logs": logs}
+    except Exception as e:
+        logger.error(f"Failed to fetch logs: {e}")
+        raise HTTPException(500, "Internal Server Error")

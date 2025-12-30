@@ -18,6 +18,11 @@ class Settings:
     MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "queuemangementsystem")
     SYNC_BATCH_SIZE = int(os.getenv("SYNC_BATCH_SIZE", "5000"))
     DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "t")
+
+    # Scheduler Config
+    SYNC_INTERVAL_MINUTES = int(os.getenv("SYNC_INTERVAL_MINUTES", "60"))
+    # Default collections to sync if not specified
+    TARGET_COLLECTIONS = os.getenv("TARGET_COLLECTIONS", "ticket,users").split(",")
     
     # Auth
     API_KEY = os.getenv("API_KEY")

@@ -9,7 +9,7 @@ from redis.asyncio import Redis
 
 from src.api.routes import router as api_router
 from src.config import settings
-from src.core.db import close_mongo_clients, init_metadata_table, run_sync
+from src.core.db import close_mongo_clients, init_metadata_table, init_history_table, run_sync
 from src.core.logger import setup_logging
 from src.services.etl import sync_collection_streaming
 
@@ -27,14 +27,13 @@ async def scheduled_sync_job():
     """
     logger.info("⏳ Scheduled Sync Job Started...")
     
-    # Define which collections you want to auto-sync
-    # You might want to move this to config.py later
-    TARGET_COLLECTIONS = ["ticket", "users"] 
+    TARGET_COLLECTIONS = settings.TARGET_COLLECTIONS
 
     for collection in TARGET_COLLECTIONS:
+        # Strip whitespace just in case config has "ticket, users"
+        collection = collection.strip()
         for name, uri in settings.MONGO_SOURCES.items():
             try:
-                logger.info(f"Auto-syncing {collection} from {name}...")
                 await sync_collection_streaming(name, uri, collection)
             except Exception as e:
                 logger.error(f"Auto-sync failed for {name}/{collection}: {e}")
@@ -57,14 +56,22 @@ async def lifespan(app: FastAPI):
         sys.exit(1)
 
     try:
-        # init_metadata_table is sync, run it in executor
+        # init tables (sync, run in executor)
         await run_sync(init_metadata_table)
-        logger.info("Metadata table checked/created.")
+        await run_sync(init_history_table)
+        logger.info("Database tables checked/created.")
         
-        # Start Scheduler
+        # Start Scheduler with Config
         scheduler.start()
-        scheduler.add_job(scheduled_sync_job, "interval", minutes=60, id="auto_sync")
-        logger.info("Scheduler started with auto_sync job (every 60m).")
+        scheduler.add_job(
+            scheduled_sync_job, 
+            "interval", 
+            minutes=settings.SYNC_INTERVAL_MINUTES, 
+            id="auto_sync",
+            coalesce=True, # Prevent overlapping runs if one takes too long
+            max_instances=1
+        )
+        logger.info(f"Scheduler started with auto_sync job (every {settings.SYNC_INTERVAL_MINUTES}m).")
         
     except Exception as e:
         logger.error(f"Failed to init DB: {e}")

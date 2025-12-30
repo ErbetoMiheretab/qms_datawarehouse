@@ -51,6 +51,23 @@ def init_metadata_table():
     with engine.begin() as conn:
         conn.execute(query)
 
+def init_history_table():
+    """Ensures the sync history table exists."""
+    query = text("""
+        CREATE TABLE IF NOT EXISTS sync_history (
+            id UUID PRIMARY KEY,
+            source TEXT,
+            collection TEXT,
+            status TEXT,
+            started_at TIMESTAMP WITH TIME ZONE,
+            completed_at TIMESTAMP WITH TIME ZONE,
+            records_synced INTEGER DEFAULT 0,
+            message TEXT
+        );
+    """)
+    with engine.begin() as conn:
+        conn.execute(query)
+
 def psql_insert_copy(table, conn, keys, data_iter):
     """
     SQLAlchemy `to_sql` method override.

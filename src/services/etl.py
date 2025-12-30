@@ -150,6 +150,34 @@ async def _process_batch(buffer: list[dict[str, Any]], source_name: str, collect
         partial(write_df_to_sql_sync, df, collection)
     )
 
+def _log_start_history(history_id: str, source: str, collection: str):
+    query = text("""
+        INSERT INTO sync_history (id, source, collection, status, started_at, message)
+        VALUES (:id, :source, :collection, 'STARTED', :now, 'Sync started')
+    """)
+    with engine.begin() as conn:
+        conn.execute(query, {
+            "id": history_id,
+            "source": source,
+            "collection": collection,
+            "now": datetime.now(UTC)
+        })
+
+def _log_end_history(history_id: str, status: str, records: int, message: str):
+    query = text("""
+        UPDATE sync_history 
+        SET status = :status, completed_at = :now, records_synced = :records, message = :message
+        WHERE id = :id
+    """)
+    with engine.begin() as conn:
+        conn.execute(query, {
+            "id": history_id,
+            "status": status,
+            "now": datetime.now(UTC),
+            "records": records,
+            "message": message
+        })
+
 async def sync_collection_streaming(source_name: str, source_uri: str, collection_name: str):
     """
     Orchestrates the streaming sync.
@@ -158,6 +186,9 @@ async def sync_collection_streaming(source_name: str, source_uri: str, collectio
         source_uri: 'mongodb://localhost...' (used for connection)
         collection_name: 'users'
     """
+    history_id = str(uuid.uuid4())
+    await run_sync(_log_start_history, history_id, source_name, collection_name)
+
     batch_size = settings.SYNC_BATCH_SIZE
     logger.info(f"Starting sync for {collection_name} from {source_name}")
     
@@ -220,8 +251,11 @@ async def sync_collection_streaming(source_name: str, source_uri: str, collectio
         duration = (datetime.now(UTC) - start_time).total_seconds()
         msg = f"Synced {count} rows from {source_name} to {collection_name} in {duration:.2f}s"
         logger.info(msg)
+        
+        await run_sync(_log_end_history, history_id, "SUCCESS", count, msg)
         return msg
 
     except Exception as e:
         logger.exception(f"Failed to sync {collection_name} from {source_name}: {e}")
+        await run_sync(_log_end_history, history_id, "FAILED", count, str(e))
         raise
