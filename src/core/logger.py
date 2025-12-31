@@ -8,10 +8,19 @@ def setup_logging():
     """
     log_level = logging.DEBUG if settings.DEBUG else logging.INFO
     
-    formatter = logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    )
+    # Determine format based on environment/config
+    if settings.DEBUG:
+        # Human-readable for dev
+        formatter = logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
+        )
+    else:
+        # JSON for production (Splunk, ELK, etc.)
+        from pythonjsonlogger import jsonlogger
+        formatter = jsonlogger.JsonFormatter(
+            "%(asctime)s %(levelname)s %(name)s %(message)s %(filename)s %(lineno)d"
+        )
     
     # Configure Root Logger
     root_logger = logging.getLogger()
@@ -28,5 +37,6 @@ def setup_logging():
     # Set levels for noisy libraries
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("apscheduler").setLevel(logging.INFO)
 
-    logging.info(f"Logging configured at level: {logging.getLevelName(log_level)}")
+    logging.info(f"Logging configured at level: {logging.getLevelName(log_level)}", extra={"event": "startup"})

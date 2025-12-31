@@ -1,7 +1,7 @@
 services:
   # Central Data Warehouse (Postgres)
   warehouse:
-    image: postgres:latest
+    image: postgres:15
     container_name: analytics_warehouse
     ports:
       - "5430:5432" # Host Port : Container Port
