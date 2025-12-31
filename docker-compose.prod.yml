@@ -6,13 +6,13 @@ services:
     ports:
       - "5430:5432" # Host Port : Container Port
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: supersecretpassword
-      POSTGRES_DB: analytics
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - warehouse_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d analytics"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -43,15 +43,15 @@ services:
       redis:
         condition: service_healthy
     environment:
-      - WAREHOUSE_URL=postgresql://admin:supersecretpassword@warehouse:5430/analytics
-      - REDIS_URL=redis://redis:6370/0
+      - WAREHOUSE_URL=${WAREHOUSE_URL}
+      - REDIS_URL=${REDIS_URL}
       # Valid JSON string for multiple sources
-      - MONGO_SOURCES='{"mesob_arada": "mongodb://root:root.password@172.16.26.12:27027/queuemanagementsystem?authSource=admin", "mesob_bole": "mongodb://root:root.password@172.16.26.22:27017/queuemanagementsystem?authSource=admin"}'
-      - API_KEY=prod-secret-key
-      - SYNC_INTERVAL_MINUTES=60
+      - MONGO_SOURCES=${MONGO_SOURCES}
+      - API_KEY=${API_KEY}
+      - SYNC_INTERVAL_MINUTES=${SYNC_INTERVAL_MINUTES}
       # Matching the variable name in src/config.py
-      - SYNC_COLLECTIONS=ticket,users, queue
-      - DEBUG=False
+      - SYNC_COLLECTIONS=${SYNC_COLLECTIONS}
+      - DEBUG=${DEBUG}
 
 # Define named volumes for persistence
 volumes:
