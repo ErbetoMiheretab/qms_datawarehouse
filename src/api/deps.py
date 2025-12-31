@@ -1,17 +1,21 @@
-from fastapi import HTTPException, Security
+from fastapi import HTTPException, Security, Request
 from fastapi.security.api_key import APIKeyHeader
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from src.config import settings
-
-api_key_header = APIKeyHeader(name=settings.API_KEY_NAME, auto_error=False)
-
 import logging
 
+# Initialize Rate Limiter
+limiter = Limiter(key_func=get_remote_address)
+
+api_key_header = APIKeyHeader(name=settings.API_KEY_NAME, auto_error=False)
 logger = logging.getLogger("auth")
 
 async def get_api_key(api_key_header: str = Security(api_key_header)):
     # --- TEMPORARY AUTH DISABLE ---
-    return api_key_header
+        return api_key_header
     # ------------------------------
 
     # if not settings.API_KEY:

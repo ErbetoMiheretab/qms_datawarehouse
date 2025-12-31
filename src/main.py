@@ -6,7 +6,11 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from redis.asyncio import Redis
+from prometheus_fastapi_instrumentator import Instrumentator
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
+from src.api.deps import limiter
 from src.api.routes import router as api_router
 from src.config import settings
 from src.core.db import close_mongo_clients, init_metadata_table, init_history_table, run_sync
@@ -84,13 +88,23 @@ async def lifespan(app: FastAPI):
     close_mongo_clients()
 
 app = FastAPI(title="ETL Sync Service", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Strict CORS for Production
+origins = ["*"] # Default open
+if hasattr(settings, "ALLOWED_ORIGINS") and settings.ALLOWED_ORIGINS:
+    origins = settings.ALLOWED_ORIGINS.split(",")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In strict prod, restrict this.
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST"], # Restrict methods
     allow_headers=["*"],
 )
+
+# Instrument Prometheus
+Instrumentator().instrument(app).expose(app)
 
 app.include_router(api_router)

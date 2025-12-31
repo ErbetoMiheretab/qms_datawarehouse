@@ -31,7 +31,7 @@ def mongo_container():
 
 @pytest.fixture(scope="session")
 def postgres_container():
-    with PostgresContainer("postgres:latest") as postgres:
+    with PostgresContainer("postgres:15") as postgres:
         yield postgres
 
 @pytest.fixture(scope="session")
